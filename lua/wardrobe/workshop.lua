@@ -38,6 +38,35 @@ end
 workshop.maxsize = wardrobe and wardrobe.config.maxFileSize or 0
 workshop.whitelist = wardrobe and wardrobe.config.whitelistIds or {}
 
+local function __trySteamworksDL( wsid, isUGC, path, fileInfo, callback )
+	if not path then
+		return workshop.err(wsid, WS_DOWNLOADFAILED)
+	end
+
+	if ( isUGC ) then
+		print("Workshop | UGC | Path:", path)
+		print("URL: https://steamcommunity.com/sharedfiles/filedetails/?id=" .. wsid)
+		print("---")
+		print("There is no way to read GMA files from inside Garry's Mod.")
+		print("Go to the path above and copy that file into `data/wardrobe`,")
+		print("rename to \"" .. wsid .. ".dat\" and try again, sorry." )
+		print("Go yell at Facepunch about this.")
+		print("")
+		print("You might need to clear your cache...")
+		return workshop.err(wsid, WS_DOWNLOADFAILED)
+	else
+		if not file.Exists(path, "MOD") then
+			return workshop.err(wsid, WS_MISSINGFILE)
+		end
+		print("Workshop | Path:", path)
+	end
+
+	workshop.got[wsid] = true
+	workshop.reasons[wsid] = path
+
+	callback(path, fileInfo)
+end
+
 local function _fetch(wsid, fileInfo, validate, callback)
 	if not fileInfo or not fileInfo.fileid then
 		return workshop.err(wsid, WS_NOFILEINFO)
@@ -56,21 +85,17 @@ local function _fetch(wsid, fileInfo, validate, callback)
 
 	print("Workshop | Downloading", wsid)
 
-	steamworks.Download(fileInfo.fileid, true, function(path)
-		if not path then
-			return workshop.err(wsid, WS_DOWNLOADFAILED)
+	steamworks.Download(fileInfo.fileid, true, function( path )
+		__trySteamworksDL( wsid, false, path, fileInfo, callback )
+	end)
+
+	steamworks.DownloadUGC( wsid, function( path )
+		local dataPath = "data/wardrobe/" .. wsid .. ".dat"
+		if not file.Exists( dataPath, "MOD") then
+			__trySteamworksDL( wsid, true, path, fileInfo, callback )
+		else
+			__trySteamworksDL( wsid, false, dataPath, fileInfo, callback )
 		end
-
-		if not file.Exists(path, "MOD") then
-			return workshop.err(wsid, WS_MISSINGFILE)
-		end
-
-		print("Workshop | Path:", path)
-
-		workshop.got[wsid] = true
-		workshop.reasons[wsid] = path
-
-		callback(path, fileInfo)
 	end)
 end
 
